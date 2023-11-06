@@ -161,6 +161,7 @@ func (suite *BackendTestSuite) buildFormattedBlock(
 		bloom,
 		common.BytesToAddress(validator.Bytes()),
 		baseFee,
+		nil,
 	)
 }
 

@@ -1119,6 +1119,7 @@ func (suite *BackendTestSuite) TestGetEthBlockFromTendermint() {
 				bloom,
 				common.BytesToAddress(tc.validator.Bytes()),
 				tc.baseFee,
+				nil,
 			)
 
 			if tc.expPass {
@@ -1297,7 +1298,7 @@ func (suite *BackendTestSuite) TestHeaderByNumber() {
 			header, err := suite.backend.HeaderByNumber(tc.blockNumber)
 
 			if tc.expPass {
-				expHeader := ethrpc.EthHeaderFromTendermint(expResultBlock.Block.Header, ethtypes.Bloom{}, tc.baseFee)
+				expHeader := ethrpc.EthHeaderFromTendermint(expResultBlock.Block.Header, ethtypes.Bloom{}, tc.baseFee, nil)
 				suite.Require().NoError(err)
 				suite.Require().Equal(expHeader, header)
 			} else {
@@ -1408,7 +1409,7 @@ func (suite *BackendTestSuite) TestHeaderByHash() {
 			header, err := suite.backend.HeaderByHash(tc.hash)
 
 			if tc.expPass {
-				expHeader := ethrpc.EthHeaderFromTendermint(expResultBlock.Block.Header, ethtypes.Bloom{}, tc.baseFee)
+				expHeader := ethrpc.EthHeaderFromTendermint(expResultBlock.Block.Header, ethtypes.Bloom{}, tc.baseFee, nil)
 				suite.Require().NoError(err)
 				suite.Require().Equal(expHeader, header)
 			} else {
@@ -1472,6 +1473,7 @@ func (suite *BackendTestSuite) TestEthBlockByNumber() {
 					emptyBlock.Header,
 					ethtypes.Bloom{},
 					sdk.NewInt(1).BigInt(),
+					nil,
 				),
 				[]*ethtypes.Transaction{},
 				nil,
@@ -1499,6 +1501,7 @@ func (suite *BackendTestSuite) TestEthBlockByNumber() {
 					emptyBlock.Header,
 					ethtypes.Bloom{},
 					sdk.NewInt(1).BigInt(),
+					nil,
 				),
 				[]*ethtypes.Transaction{msgEthereumTx.AsTransaction()},
 				nil,
@@ -1563,6 +1566,7 @@ func (suite *BackendTestSuite) TestEthBlockFromTendermintBlock() {
 					emptyBlock.Header,
 					ethtypes.Bloom{},
 					sdk.NewInt(1).BigInt(),
+					nil,
 				),
 				[]*ethtypes.Transaction{},
 				nil,
@@ -1598,6 +1602,7 @@ func (suite *BackendTestSuite) TestEthBlockFromTendermintBlock() {
 					emptyBlock.Header,
 					ethtypes.Bloom{},
 					sdk.NewInt(1).BigInt(),
+					nil,
 				),
 				[]*ethtypes.Transaction{msgEthereumTx.AsTransaction()},
 				nil,

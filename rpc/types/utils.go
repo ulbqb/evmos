@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
+	ethtrie "github.com/ethereum/go-ethereum/trie"
 )
 
 // ExceedBlockGasLimitError defines the error message when tx execution exceeds the block gas limit.
@@ -64,10 +65,18 @@ func RawTxToEthTx(clientCtx client.Context, txBz tmtypes.Tx) ([]*evmtypes.MsgEth
 
 // EthHeaderFromTendermint is an util function that returns an Ethereum Header
 // from a tendermint Header.
-func EthHeaderFromTendermint(header tmtypes.Header, bloom ethtypes.Bloom, baseFee *big.Int) *ethtypes.Header {
+func EthHeaderFromTendermint(header tmtypes.Header, bloom ethtypes.Bloom, baseFee *big.Int, receipts ethtypes.Receipts) *ethtypes.Header {
 	txHash := ethtypes.EmptyRootHash
+	var receiptsRoot common.Hash
 	if len(header.DataHash) == 0 {
 		txHash = common.BytesToHash(header.DataHash)
+	}
+
+	if receipts != nil {
+		hasher := ethtrie.NewStackTrie(nil)
+		receiptsRoot = ethtypes.DeriveSha(ethtypes.Receipts(receipts), hasher)
+	} else {
+		receiptsRoot = ethtypes.EmptyRootHash
 	}
 
 	time := uint64(header.Time.UTC().Unix()) // #nosec G701
@@ -77,7 +86,7 @@ func EthHeaderFromTendermint(header tmtypes.Header, bloom ethtypes.Bloom, baseFe
 		Coinbase:    common.BytesToAddress(header.ProposerAddress),
 		Root:        common.BytesToHash(header.AppHash),
 		TxHash:      txHash,
-		ReceiptHash: ethtypes.EmptyRootHash,
+		ReceiptHash: receiptsRoot,
 		Bloom:       bloom,
 		Difficulty:  big.NewInt(0),
 		Number:      big.NewInt(header.Height),
@@ -115,13 +124,17 @@ func BlockMaxGasFromConsensusParams(goCtx context.Context, clientCtx client.Cont
 func FormatBlock(
 	header tmtypes.Header, size int, gasLimit int64,
 	gasUsed *big.Int, transactions []interface{}, bloom ethtypes.Bloom,
-	validatorAddr common.Address, baseFee *big.Int,
+	validatorAddr common.Address, baseFee *big.Int, receipts ethtypes.Receipts,
 ) map[string]interface{} {
 	var transactionsRoot common.Hash
+	var receiptsRoot common.Hash
 	if len(transactions) == 0 {
 		transactionsRoot = ethtypes.EmptyRootHash
+		receiptsRoot = ethtypes.EmptyRootHash
 	} else {
 		transactionsRoot = common.BytesToHash(header.DataHash)
+		hasher := ethtrie.NewStackTrie(nil)
+		receiptsRoot = ethtypes.DeriveSha(ethtypes.Receipts(receipts), hasher)
 	}
 
 	result := map[string]interface{}{
@@ -141,7 +154,7 @@ func FormatBlock(
 		"gasUsed":          (*hexutil.Big)(gasUsed),
 		"timestamp":        hexutil.Uint64(header.Time.Unix()),
 		"transactionsRoot": transactionsRoot,
-		"receiptsRoot":     ethtypes.EmptyRootHash,
+		"receiptsRoot":     receiptsRoot,
 
 		"uncles":          []common.Hash{},
 		"transactions":    transactions,

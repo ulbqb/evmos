@@ -17,6 +17,7 @@ package backend
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -315,7 +316,25 @@ func (b *Backend) HeaderByNumber(blockNum rpctypes.BlockNumber) (*ethtypes.Heade
 		b.logger.Error("failed to fetch Base Fee from prunned block. Check node prunning configuration", "height", resBlock.Block.Height, "error", err)
 	}
 
-	ethHeader := rpctypes.EthHeaderFromTendermint(resBlock.Block.Header, bloom, baseFee)
+	msgs := b.EthMsgsFromTendermintBlock(resBlock, blockRes)
+	var receipts ethtypes.Receipts
+	for _, ethMsg := range msgs {
+		hash := common.HexToHash(ethMsg.Hash)
+		res, err := b.GetTransactionReceipt(hash)
+		if err != nil {
+			b.logger.Error("failed to get receipt", "hash", hash, "err", err)
+		}
+		jsonStr, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println(err)
+		}
+		var receipt ethtypes.Receipt
+		if err := json.Unmarshal(jsonStr, &receipt); err != nil {
+			b.logger.Error("unmarshal receipt", "hash", hash, "err", err)
+		}
+		receipts = append(receipts, &receipt)
+	}
+	ethHeader := rpctypes.EthHeaderFromTendermint(resBlock.Block.Header, bloom, baseFee, receipts)
 	return ethHeader, nil
 }
 
@@ -345,7 +364,7 @@ func (b *Backend) HeaderByHash(blockHash common.Hash) (*ethtypes.Header, error) 
 		b.logger.Error("failed to fetch Base Fee from prunned block. Check node prunning configuration", "height", resBlock.Block.Height, "error", err)
 	}
 
-	ethHeader := rpctypes.EthHeaderFromTendermint(resBlock.Block.Header, bloom, baseFee)
+	ethHeader := rpctypes.EthHeaderFromTendermint(resBlock.Block.Header, bloom, baseFee, nil)
 	return ethHeader, nil
 }
 
@@ -382,12 +401,28 @@ func (b *Backend) RPCBlockFromTendermintBlock(
 	}
 
 	msgs := b.EthMsgsFromTendermintBlock(resBlock, blockRes)
+	var receipts ethtypes.Receipts
 	for txIndex, ethMsg := range msgs {
+		hash := common.HexToHash(ethMsg.Hash)
 		if !fullTx {
 			hash := common.HexToHash(ethMsg.Hash)
 			ethRPCTxs = append(ethRPCTxs, hash)
 			continue
 		}
+
+		res, err := b.GetTransactionReceipt(hash)
+		if err != nil {
+			b.logger.Error("failed to get receipt", "hash", hash, "err", err)
+		}
+		jsonStr, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println(err)
+		}
+		var receipt ethtypes.Receipt
+		if err := json.Unmarshal(jsonStr, &receipt); err != nil {
+			b.logger.Error("unmarshal receipt", "hash", hash, "err", err)
+		}
+		receipts = append(receipts, &receipt)
 
 		tx := ethMsg.AsTransaction()
 		height := uint64(block.Height) //#nosec G701 -- checked for int overflow already
@@ -457,7 +492,7 @@ func (b *Backend) RPCBlockFromTendermintBlock(
 	formattedBlock := rpctypes.FormatBlock(
 		block.Header, block.Size(),
 		gasLimit, new(big.Int).SetUint64(gasUsed),
-		ethRPCTxs, bloom, validatorAddr, baseFee,
+		ethRPCTxs, bloom, validatorAddr, baseFee, receipts,
 	)
 	return formattedBlock, nil
 }
@@ -500,7 +535,7 @@ func (b *Backend) EthBlockFromTendermintBlock(
 		b.logger.Error("failed to fetch Base Fee from prunned block. Check node prunning configuration", "height", height, "error", err)
 	}
 
-	ethHeader := rpctypes.EthHeaderFromTendermint(block.Header, bloom, baseFee)
+	ethHeader := rpctypes.EthHeaderFromTendermint(block.Header, bloom, baseFee, nil)
 	msgs := b.EthMsgsFromTendermintBlock(resBlock, blockRes)
 
 	txs := make([]*ethtypes.Transaction, len(msgs))
